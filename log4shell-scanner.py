@@ -48,6 +48,10 @@ def get_arguments():
                         help="request timeout",
                         dest="timeout",
                         type=int)
+    parser.add_argument("-v", "--verbose",
+                        action="store_true",
+                        dest="verbose",
+                        help="verbose logging")
     test_group = parser.add_argument_group("Tests")
     test_group.add_argument("--headers",
                             action="append_const",
@@ -140,4 +144,6 @@ if __name__ == '__main__':
     cprint("[*] Start testing", color="magenta", attrs=["bold", "underline"])
     for endpoint, id in mappings:
         testing_payload = build_testing_payload(id, args.host, args.payload)
+        if args.verbose:
+            cprint(f" [%] Payload: {testing_payload}", color="cyan")
         test_entry(endpoint, testing_payload, id, args.timeout)
