@@ -42,6 +42,12 @@ def get_arguments():
                         default=OUTPUT_FILE,
                         help="output file on which will be saved the endpoint-ID mappings",
                         dest="output")
+    parser.add_argument("-t", "--timeout",
+                        action="store",
+                        default=10,
+                        help="request timeout",
+                        dest="timeout",
+                        type=int)
     test_group = parser.add_argument_group("Tests")
     test_group.add_argument("--headers",
                             action="append_const",
@@ -71,8 +77,8 @@ def get_entries(filename):
         return lines
 
 
-def build_testing_payload(id, host):
-    return TESTING_PAYLOAD.replace("HOST", TESTING_HOST).replace("ID", id)
+def build_testing_payload(id, host, payload):
+    return payload.replace("HOST", host).replace("ID", id)
 
 
 def generate_endpoint_id(endpoint):
@@ -83,13 +89,13 @@ def generate_mappings(endpoints):
     return [(endpoint, generate_endpoint_id(endpoint)) for endpoint in endpoints]
 
 
-def test_entry(endpoint, payload, id):
+def test_entry(endpoint, payload, id, timeout):
     cprint(f"[*] [ID: {id}] Testing endpoint {endpoint}", "green")
     for test_key, test_fun in TESTS_LIST:
         try:
-            test_fun(endpoint, payload)
+            test_fun(endpoint, payload, timeout)
         except Exception as e:
-            cprint(f" ! [{test_key}] Test failed with: {e}", color="red")
+            cprint(f" [!] [{test_key}] Test failed with: {e}", color="red")
 
 
 def get_endpoints_from_entries(entries, http, https):
@@ -133,5 +139,5 @@ if __name__ == '__main__':
 
     cprint("[*] Start testing", color="magenta", attrs=["bold", "underline"])
     for endpoint, id in mappings:
-        testing_payload = build_testing_payload(id, args.host)
-        test_entry(endpoint, testing_payload, id)
+        testing_payload = build_testing_payload(id, args.host, args.payload)
+        test_entry(endpoint, testing_payload, id, args.timeout)
