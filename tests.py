@@ -2,9 +2,17 @@ import requests
 from urllib import parse
 # from requests import HTTPError
 
+HEADERS = [
+    "user-agent",
+    "X-Api-Version",
+    "referer",
+    "x-forwarded-for",
+    "host"
+]
+
 
 def test_header(endpoint, payload, timeout):
-    headers = {'user-agent': payload, 'X-Api-Version': payload}
+    headers = {header: payload for header in HEADERS}
     requests.get(endpoint, headers=headers, verify=False, timeout=timeout)
 
 
