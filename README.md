@@ -1,5 +1,6 @@
 # Log4Scan
 ### A simple automatic tool for finding vulnerable log4j hosts
+![image](https://user-images.githubusercontent.com/9747718/146039311-ee3852ea-020f-434f-9aeb-3913774429e9.png)
 ## Installation
 ```shell
 pip3 install -r requirements.txt
