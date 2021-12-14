@@ -11,4 +11,4 @@ RUN pip3 install -r requirements.txt
 # copy the content of the local src directory to the working directory
 COPY ./ .
 
-ENTRYPOINT ["python", "log4shell-scanner.py" ]
+ENTRYPOINT ["python", "log4scan.py" ]
