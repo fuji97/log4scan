@@ -320,7 +320,7 @@ def execute_interactsh(mappings, args):
 
     if len(logs) > 0:
         if len(endpoints) != len(logs):
-            cprint(f"[???] {len(logs) - len(endpoints)} missing correspondences between logs and ID", color="orange")
+            cprint(f"[???] {len(logs) - len(endpoints)} missing correspondences between logs and ID", color="yellow")
 
         if len(endpoints) > 0:
             cprint("[!!!] Vulnerable endpoints found!", color="red", attrs=["bold"])
