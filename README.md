@@ -66,14 +66,14 @@ python3 log4scan.py -f ./hosts.txt -m ./mapping.csv -o ./vulnerable-endpoints.tx
 
 ## Docker
 ### Execute from image
-'''shell
+```shell
 docker run --name log4scan ghcr.io/fuji97/log4scan
-'''
+```
 ### Build and execute yourself
-'''shell
+```shell
 docker build . -t log4scan
 docker run --name log4scan log4scan
-'''
+```
 
 ## License
 This project is licensed under **MIT License**
