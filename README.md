@@ -45,11 +45,15 @@ Tests:
 ### Basic Usage
 Automatically test a single endpoint
 ```shell
-python3 log4scan.py -e http://vulnerablemachine.com
+python3 log4scan.py -e https://vulnerablemachine.com
 ```
 Automatically test multiple endpoints defined in a file
 ```shell
 python3 log4scan.py -f ./hosts.txt
+```
+Manually test multiple endpoints defined in a file with private host
+```shell
+python3 log4scan.py -f ./hosts.txt --manual --host privatehost.net
 ```
 Manually test multiple endpoints defined in a file with custom payload and private host
 ```shell
@@ -59,6 +63,17 @@ Automatically test multiple endpoints defined in a file and generate two files c
 ```shell
 python3 log4scan.py -f ./hosts.txt -m ./mapping.csv -o ./vulnerable-endpoints.txt
 ```
+
+## Docker
+### Execute from image
+'''shell
+docker run --name log4scan ghcr.io/fuji97/log4scan
+'''
+### Build and execute yourself
+'''shell
+docker build . -t log4scan
+docker run --name log4scan log4scan
+'''
 
 ## License
 This project is licensed under **MIT License**
