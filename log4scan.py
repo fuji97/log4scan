@@ -11,6 +11,8 @@ from urllib import parse
 import base64
 import json
 import random
+import asyncio
+import httpx
 from uuid import uuid4
 from base64 import b64encode
 from Crypto.Cipher import AES, PKCS1_OAEP
@@ -20,6 +22,7 @@ from Crypto.Hash import SHA256
 # Disable insecure SSL warning
 try:
     import requests.packages.urllib3
+
     requests.packages.urllib3.disable_warnings()
 except Exception:
     pass
@@ -225,15 +228,19 @@ def generate_mappings(endpoints):
     return {generate_endpoint_id(endpoint): endpoint for endpoint in endpoints}
 
 
-def test_entry(endpoint, payload, id, args):
-    cprint(f"[*] [ID: {id}] Testing endpoint {endpoint}", "green")
+async def test_entry(current, total, endpoint, payload, id, args):
+    cprint(f"[*] [{current + 1}/{total}] [ID: {id}] Testing endpoint {endpoint}", "green")
     if args.verbose:
         cprint(f"[%] Payload: {payload}", color="cyan")
-    for test_key, test_fun in TESTS_LIST:
-        try:
-            test_fun(endpoint, payload, args)
-        except Exception as e:
-            cprint(f"[!] [{test_key}] Test failed with: {e}", color="red")
+
+    tasks = []
+    async with httpx.AsyncClient(verify=False, timeout=args.timeout, proxies=args.proxy) as client:
+        for test_key, test_fun in TESTS_LIST:
+            try:
+                tasks.append(asyncio.create_task(test_fun(client, endpoint, payload, args)))
+            except Exception as e:
+                cprint(f"[!] [{test_key}] Test failed with: {e}", color="red")
+        await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
 
 def get_endpoints_from_entries(entries, http, https):
@@ -270,33 +277,55 @@ def generate_result_file(endpoints, file):
 
 
 # Tests
-def test_header(endpoint, payload, args):
+async def test_header(client, endpoint, payload, args):
     if args.headers is not None:
         headers = read_file_rows(args.headers)
     else:
         headers = HEADERS
-
     headers = {header: payload for header in headers}
-    requests.get(endpoint, headers=headers,
-                 verify=False,
-                 timeout=args.timeout,
-                 proxies=args.proxy)
+
+    if args.verbose:
+        cprint("[%] [Headers] Start request", color="blue")
+
+    try:
+        await client.get(endpoint, headers=headers)
+    except Exception as e:
+        cprint(f"[!] [Header] Error during request: {e}", color="yellow")
+        return
+
+    if args.verbose:
+        cprint("[%] [Headers] Request ended", color="blue")
 
 
-def test_get(endpoint, payload, args):
+async def test_get(client, endpoint, payload, args):
     params = {"id": payload}
-    requests.get(endpoint, params=params,
-                 verify=False,
-                 timeout=args.timeout,
-                 proxies=args.proxy)
+    if args.verbose:
+        cprint("[%] [Query] Start request", color="blue")
+
+    try:
+        await client.get(endpoint, params=params)
+    except Exception as e:
+        cprint(f"[!] [Query] Error during request: {e}", color="yellow")
+        return
+
+    if args.verbose:
+        cprint("[%] [Query] Request ended", color="blue")
 
 
-def test_path(endpoint, payload, args):
+async def test_path(client, endpoint, payload, args):
     url = parse.urljoin(endpoint, parse.quote(payload, safe=''))
-    requests.get(url,
-                 verify=False,
-                 timeout=args.timeout,
-                 proxies=args.proxy)
+
+    if args.verbose:
+        cprint("[%] [Path] Start request", color="blue")
+
+    try:
+        await client.get(url)
+    except Exception as e:
+        cprint(f"[!] [Path] Error during request: {e}", color="yellow")
+        return
+
+    if args.verbose:
+        cprint("[%] [Path] Request ended", color="blue")
 
 
 TESTS_LIST = [("Headers", test_header),
@@ -305,23 +334,24 @@ TESTS_LIST = [("Headers", test_header),
 
 
 def execute_manual(mappings, args):
-    for id, endpoint in mappings.items():
+    for i, id, endpoint in [(i, elem[0], elem[1]) for elem, i in zip(mappings.items(), range(len(mappings)))]:
         testing_payload = build_testing_payload(id, args.host, args.payload)
-        test_entry(endpoint, testing_payload, id, args)
+        asyncio.run(test_entry(i, len(mappings), endpoint, testing_payload, id, args))
 
 
 def execute_interactsh(mappings, args):
     cprint("[*] Initialize interact.sh", color="blue")
     service = Interactsh(args.interact_token, args.host)
 
-    for id, endpoint in mappings.items():
+    for i, id, endpoint in [(i, elem[0], elem[1]) for elem, i in zip(mappings.items(), range(len(mappings)))]:
         testing_payload = service.build_payload(args.payload, id)
-        test_entry(endpoint, testing_payload, id, args)
+        asyncio.run(test_entry(i, len(mappings), endpoint, testing_payload, id, args))
 
     print()
     cprint("[*] Start verification", color="cyan", attrs=["bold", "underline"])
     logs = service.poll()
-    ids = {log["full-id"].split(".")[0] for log in logs if log["full-id"] is not None and INTERACTSH_REGEX.match(log["full-id"])}
+    ids = {log["full-id"].split(".")[0] for log in logs if
+           log["full-id"] is not None and INTERACTSH_REGEX.match(log["full-id"])}
     endpoints = {mappings[id] for id in ids if id in mappings}
 
     if len(ids) > 0:
