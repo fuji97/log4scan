@@ -181,7 +181,9 @@ def get_arguments():
                         dest="interact_token",
                         help="Custom interact.sh token")
     parser.add_argument("-u", "--uri",
-                        dest="uri")
+                        dest="uri",
+                        help="define custom URI format",
+                        default=DEFAULT_URI)
     test_group = parser.add_argument_group("Tests", "[default: Headers, Query, Path]")
     test_group.add_argument("--headers",
                             action="append_const",
