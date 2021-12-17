@@ -7,10 +7,10 @@ pip3 install -r requirements.txt
 ```
 ## Usage
 ```
-usage: log4scan.py [-h] (-f FILENAME | -e ENDPOINT) [--http] [--https] [-p PAYLOAD] [--host HOST] [-o OUTPUT_FILE] [-m MAPPING_FILE] [-t TIMEOUT] [-v]
-                   [--headers-file HEADERS] [--manual] [--proxy PROXY] [--token INTERACT_TOKEN] [--headers] [--query] [--path]
+python3 log4scan.py -h
+usage: log4scan.py [-h] (-f FILENAME | -e ENDPOINT) [--http] [--https] [-p PAYLOADS | --payload-file PAYLOAD_FILE] [--host HOST] [-o OUTPUT_FILE] [-m MAPPING_FILE] [-t TIMEOUT] [-v] [--headers-file HEADERS] [--manual] [--proxy PROXY] [--token INTERACT_TOKEN] [-u URI] [--headers] [--query] [--path]
 
-options:
+optional arguments:
   -h, --help            show this help message and exit
   -f FILENAME, --filename FILENAME
                         file to use as a source of endpoints (format IP:PORT)
@@ -18,9 +18,11 @@ options:
                         endpoint to test
   --http                Test HTTP on domains without explicit schema
   --https               Test HTTPS on domains without explicit schema
-  -p PAYLOAD, --payload PAYLOAD
-                        template of the testing payload to use
-  --host HOST           host to send LDAP request [default: interactsh.com]
+  -p PAYLOADS, --payload PAYLOADS
+                        add payload template to test
+  --payload-file PAYLOAD_FILE
+                        file with payload templates to test
+  --host HOST           host to send LDAP request [default: interact.sh]
   -o OUTPUT_FILE, --output OUTPUT_FILE
                         output file with vulnerable hosts
   -m MAPPING_FILE, --mappings MAPPING_FILE
@@ -34,6 +36,7 @@ options:
   --proxy PROXY         send requests through proxy
   --token INTERACT_TOKEN
                         Custom interact.sh token
+  -u URI, --uri URI     define custom URI format
 
 Tests:
   [default: Headers, Query, Path]
@@ -55,13 +58,25 @@ Manually test multiple endpoints defined in a file with private host
 ```shell
 python3 log4scan.py -f ./hosts.txt --manual --host privatehost.net
 ```
-Manually test multiple endpoints defined in a file with custom payload and private host
+Manually test multiple endpoints defined in a file with multiple custom payloads and private host
 ```shell
-python3 log4scan.py -f ./hosts.txt --manual --payload '${jndi:ldap://HOST/customprefix-ID}' --host privatehost.net
+python3 log4scan.py -f ./hosts.txt --manual -p '${jndi:ldap://{{URI}}}' -p '${jndi:dns://{{URI}}}' --host privatehost.net
+```
+Manually test multiple endpoints defined in a file with custom multiple payloads defined in a file
+```shell
+python3 log4scan.py -f ./hosts.txt --manual --payload-file ./payload-bypass-waf.txt
+```
+Manually test multiple endpoints defined in a file with custom URI and private host
+```shell
+python3 log4scan.py -f ./hosts.txt --manual -u '{{HOST}}/custompath/{{ID}}' --host privatehost.net
 ```
 Automatically test multiple endpoints defined in a file and generate two files containing the mappings between ID and endpoints and the vulnerable endpoints
 ```shell
 python3 log4scan.py -f ./hosts.txt -m ./mapping.csv -o ./vulnerable-endpoints.txt
+```
+Manually test multiple endpoints defined in a file with private host and writing a file with the mapping between ID and endpoints
+```shell
+python3 log4scan.py -f ./hosts.txt --manual --host privatehost.net -m ids.csv
 ```
 
 ## Docker
@@ -72,7 +87,7 @@ docker run --name log4scan ghcr.io/fuji97/log4scan
 ### Build and execute yourself
 ```shell
 docker build . -t log4scan
-docker run --name log4scan log4scan
+docker run --name log4scan log4scan -h
 ```
 
 ## License
