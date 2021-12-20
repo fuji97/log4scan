@@ -428,6 +428,10 @@ def main():
     else:
         execute_manual(mappings, args)
 
+    print()
+    cprint("[*] Execution finished!", color="cyan")
+    cprint("[*] Log4scan: https://github.com/fuji97/log4scan", color="cyan")
+
 
 # MAIN
 if __name__ == '__main__':
