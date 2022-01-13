@@ -277,7 +277,7 @@ def get_endpoints_from_entries(entries, http, https):
     for entry in entries:
         if entry.startswith("http://") or entry.startswith("https://"):
             endpoints.append(entry)
-            break
+            continue
 
         if http:
             endpoints.append("http://" + entry)
